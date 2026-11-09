@@ -10,6 +10,28 @@
     unknown: "Unknown",
   };
 
+  // Newznab top-level categories; subcategories share the thousand (2045 → 2000).
+  const TOP_CATEGORIES = {
+    1000: "Console",
+    2000: "Movies",
+    3000: "Audio",
+    4000: "PC",
+    5000: "TV",
+    6000: "XXX",
+    7000: "Books",
+    8000: "Other",
+  };
+  const topOf = (id) => Math.floor(id / 1000) * 1000;
+  const resultCategoryIds = (r) => (Array.isArray(r.categoryIds) ? r.categoryIds : []).map((c) => c.id);
+
+  // "2000" matches anything in Movies, "2045" only Movies/UHD.
+  const matchesCategory = (r, value) => {
+    if (value === "all") return true;
+    const wanted = Number(value);
+    const ids = resultCategoryIds(r);
+    return wanted % 1000 === 0 ? ids.some((id) => topOf(id) === wanted) : ids.includes(wanted);
+  };
+
   const SORTS = {
     seeders: { label: "Seeders", compare: (a, b) => (b.seeders ?? -1) - (a.seeders ?? -1) || (b.leechers ?? -1) - (a.leechers ?? -1) },
     leechers: { label: "Leechers", compare: (a, b) => (b.leechers ?? -1) - (a.leechers ?? -1) },
@@ -192,6 +214,7 @@
       text: "",
       privacy: "all",
       indexer: "all",
+      category: "all",
       protocol: "all",
       sort: prefs.sort,
       hideDead: prefs.hideDead,
@@ -224,6 +247,7 @@
       return state.results
         .filter((r) => state.privacy === "all" || r.privacy === state.privacy)
         .filter((r) => state.indexer === "all" || String(r.indexerId) === state.indexer)
+        .filter((r) => matchesCategory(r, state.category))
         .filter((r) => state.protocol === "all" || r.protocol === state.protocol)
         .filter((r) => !state.hideDead || r.protocol !== "torrent" || (r.seeders ?? 0) > 0)
         .filter((r) => !needle || r.title.toLowerCase().includes(needle))
@@ -341,6 +365,39 @@
     const option = (value, label, selected) =>
       `<option value="${esc(value)}"${value === selected ? " selected" : ""}>${esc(label)}</option>`;
 
+    // Main categories with their subcategories indented below, each with how
+    // many results it holds. A result counts once per entry it belongs to.
+    const categoryOptions = (results) => {
+      const tops = new Map();
+      results.forEach((r) => {
+        const ids = resultCategoryIds(r);
+        const names = new Map((r.categoryIds ?? []).map((c) => [c.id, c.name]));
+        new Set(ids.map(topOf)).forEach((top) => {
+          if (!TOP_CATEGORIES[top]) return;
+          const entry = tops.get(top) ?? { count: 0, subs: new Map() };
+          ids
+            .filter((id) => topOf(id) === top && id !== top)
+            .forEach((id) => {
+              const sub = entry.subs.get(id) ?? { name: names.get(id) ?? String(id), count: 0 };
+              entry.subs.set(id, { ...sub, count: sub.count + 1 });
+            });
+          tops.set(top, { ...entry, count: entry.count + 1 });
+        });
+      });
+
+      return [...tops.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .flatMap(([top, entry]) => [
+          { value: String(top), label: `${TOP_CATEGORIES[top]} (${entry.count})` },
+          ...[...entry.subs.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([id, sub]) => ({
+              value: String(id),
+              label: `   ${sub.name.split("/").pop()} (${sub.count})`,
+            })),
+        ]);
+    };
+
     // Dropdown options are refreshed in place as streamed batches arrive, so
     // the toolbar itself (and the focus in the filter box) never re-renders.
     const updateFilterOptions = () => {
@@ -361,6 +418,17 @@
             .sort((a, b) => a[1].name.localeCompare(b[1].name))
             .map(([id, entry]) => option(id, `${entry.name} (${entry.count})`, state.indexer)),
         ].join("");
+      }
+
+      const categorySelect = toolbar.querySelector('[data-filter="category"]');
+      if (categorySelect) {
+        const options = categoryOptions(all);
+        categorySelect.innerHTML = [
+          option("all", "All categories", state.category),
+          ...options.map((o) => option(o.value, o.label, state.category)),
+        ].join("");
+        const wrap = toolbar.querySelector("[data-category-wrap]");
+        if (wrap) wrap.hidden = options.length === 0;
       }
 
       const protocolSelect = toolbar.querySelector('[data-filter="protocol"]');
@@ -405,6 +473,9 @@
           <div class="prowlarr-chips" role="group" aria-label="Indexer privacy">${privacyChips}</div>
           <div class="degoog-select-wrap prowlarr-select-wrap">
             <select class="degoog-input prowlarr-select" data-filter="indexer" aria-label="Indexer"></select>
+          </div>
+          <div class="degoog-select-wrap prowlarr-select-wrap" data-category-wrap hidden>
+            <select class="degoog-input prowlarr-select" data-filter="category" aria-label="Category"></select>
           </div>
           <div class="degoog-select-wrap prowlarr-select-wrap" data-protocol-wrap hidden>
             <select class="degoog-input prowlarr-select" data-filter="protocol" aria-label="Protocol"></select>

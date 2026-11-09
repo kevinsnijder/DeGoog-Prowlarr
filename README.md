@@ -25,7 +25,7 @@ degoog's built-in plugin tabs are public, and their search code can't tell who i
 
 On the results card you can:
 
-- filter titles, pick a privacy level (All / Public / Semi-Private / Private), an indexer, or a protocol
+- filter titles, pick a privacy level (All / Public / Semi-Private / Private), an indexer, a protocol, or a category. The category list shows each main Newznab category (Movies, TV, Audio, PC, …) with its subcategories (UHD, WEB-DL, …) indented below, all with result counts. Picking a main category includes all of its subcategories. Tracker-specific categories are still shown on the results but aren't in the list, because each tracker numbers them differently.
 - re-sort by seeders (the default), leechers, size, age, grabs or title, and hide dead torrents. Your sort choice and the "Hide dead" setting are remembered in this browser.
 - click the title to open the tracker's details page.
 

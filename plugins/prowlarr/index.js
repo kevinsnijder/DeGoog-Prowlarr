@@ -18,6 +18,8 @@ const API_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 5;
 const MAX_QUERY_LENGTH = 300;
 const STREAM_HEARTBEAT_MS = 10_000;
+// Bump when the result fields change so older cached searches are skipped.
+const RESULT_SHAPE_VERSION = 2;
 
 const RELEASE_ID_RE = /^[0-9a-f-]{36}\.\d{1,5}$/;
 const ID_LIST_RE = /^\s*\d+(\s*,\s*\d+)*\s*$/;
@@ -317,7 +319,7 @@ const searchQueryString = (query, ids = indexerIds) => {
 
 const searchKey = (query) =>
   createHash("sha1")
-    .update(JSON.stringify([query.toLowerCase(), indexerIds, categories, limitPerIndexer, prowlarrUrl, localDownload]))
+    .update(JSON.stringify([RESULT_SHAPE_VERSION, query.toLowerCase(),indexerIds, categories, limitPerIndexer, prowlarrUrl, localDownload]))
     .digest("hex");
 
 const safeHttpUrl = (value) => {
@@ -325,11 +327,30 @@ const safeHttpUrl = (value) => {
   return /^https?:\/\//i.test(raw) ? raw : "";
 };
 
-const categoryNames = (release) =>
+// Newznab standard categories (1000 Console … 8000 Other, subs like 2045
+// Movies/UHD) are shared by every indexer, so filtering uses those. Tracker
+// specific ones (100000+) are only shown when there is nothing standard.
+// Parents are not expanded: Prowlarr's parent objects list every child.
+const STANDARD_CATEGORY_LIMIT = 100000;
+
+const releaseCategories = (release) =>
   (Array.isArray(release.categories) ? release.categories : [])
-    .map((category) => String(category?.name ?? ""))
-    .filter(Boolean)
-    .slice(0, 3);
+    .map((category) => ({ id: Number(category?.id), name: String(category?.name ?? "") }))
+    .filter((category) => Number.isInteger(category.id) && category.id > 0 && category.name);
+
+const standardCategories = (release) => {
+  const byId = new Map();
+  releaseCategories(release)
+    .filter((category) => category.id < STANDARD_CATEGORY_LIMIT)
+    .forEach((category) => byId.set(category.id, category.name));
+  return [...byId].map(([id, name]) => ({ id, name }));
+};
+
+const categoryNames = (release) => {
+  const standard = standardCategories(release);
+  const source = standard.length > 0 ? standard : releaseCategories(release);
+  return [...new Set(source.map((category) => category.name))].slice(0, 3);
+};
 
 const toNumberOrNull = (value) => (Number.isFinite(value) ? value : null);
 
@@ -380,6 +401,7 @@ const toPublic = (release, indexers, id) => {
       ageMinutes: toNumberOrNull(release.ageMinutes),
       publishDate: String(release.publishDate ?? ""),
       categories: categoryNames(release),
+      categoryIds: standardCategories(release),
       flags: (Array.isArray(release.indexerFlags) ? release.indexerFlags : []).map(String).slice(0, 4),
       infoUrl: safeHttpUrl(release.infoUrl) || safeHttpUrl(release.commentUrl),
       canDownload: Boolean(safeHttpUrl(release.downloadUrl)),
