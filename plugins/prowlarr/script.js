@@ -202,6 +202,8 @@
     const refreshBtn = root.querySelector("[data-refresh]");
     const status = root.querySelector("[data-status]");
     const streaming = root.dataset.stream === "1";
+    const sendLabelTemplate = String(root.dataset.sendLabel || "").trim() || "Send to {client}";
+    const seedDialog = root.querySelector("[data-seed-dialog]");
 
     const prefs = loadPrefs();
     const state = {
@@ -299,10 +301,12 @@
         ? `Prowlarr sends it to ${clientName} and sets it to seed ${seedText}`
         : `Prowlarr sends it to ${clientName}`;
       const local = LOCAL_ACTIONS[r.localKind === "magnet" ? "magnet" : isTorrent ? "torrent" : "nzb"];
+      const sendText = sendLabelTemplate.replaceAll("{client}", clientName);
+      // A connected button group: filled "send" on top, tonal "download" below.
       const actions = [
-        `<button type="button" class="degoog-btn degoog-btn--primary degoog-btn--sm prowlarr-btn" data-action="grab" data-id="${esc(r.id)}" data-tooltip="${esc(sendTip)}"><i class="fa-solid fa-paper-plane"></i><span>Send to ${esc(clientName)}</span></button>`,
+        `<button type="button" class="prowlarr-mbtn prowlarr-mbtn--filled" data-action="grab" data-id="${esc(r.id)}" data-tooltip="${esc(sendTip)}"><i class="fa-solid fa-paper-plane"></i><span>${esc(sendText)}</span></button>`,
         r.localKind &&
-          `<button type="button" class="degoog-btn degoog-btn--sm prowlarr-btn prowlarr-btn--quiet" data-action="local" data-kind="${esc(r.localKind)}" data-id="${esc(r.id)}" data-tooltip="${esc(local.title)}"><i class="fa-solid ${local.icon}"></i><span>${esc(local.label)}</span></button>`,
+          `<button type="button" class="prowlarr-mbtn prowlarr-mbtn--tonal" data-action="local" data-kind="${esc(r.localKind)}" data-id="${esc(r.id)}" data-tooltip="${esc(local.title)}"><i class="fa-solid ${local.icon}"></i><span>${esc(local.label)}</span></button>`,
       ]
         .filter(Boolean)
         .join("");
@@ -321,7 +325,7 @@
               <p class="result-snippet degoog-result--snippet">${snippet}</p>
               ${tags ? `<div class="result-engines degoog-result--engines">${tags}</div>` : ""}
             </div>
-            <div class="prowlarr-actions">${actions}</div>
+            <div class="prowlarr-actions" role="group" aria-label="Download options">${actions}</div>
           </div>
         </div>`;
     };
@@ -731,6 +735,37 @@
 
     const findResult = (id) => [...state.results, ...state.pending].find((r) => r.id === id);
 
+    // Torrents from an indexer with seed rules, or from a private tracker
+    // without any, ask for confirmation before landing on this device.
+    const needsSeedConfirm = (r) =>
+      r?.protocol === "torrent" && (Boolean(seedSummary(r.seed)) || r.privacy === "private");
+
+    const confirmSeeding = (r, kind) =>
+      new Promise((resolve) => {
+        if (!seedDialog || typeof seedDialog.showModal !== "function") {
+          resolve(true);
+          return;
+        }
+        const summary = seedSummary(r.seed);
+        const title = seedDialog.querySelector("[data-seed-title]");
+        const text = seedDialog.querySelector("[data-seed-text]");
+        const rule = seedDialog.querySelector("[data-seed-rule]");
+        const ok = seedDialog.querySelector("[data-seed-ok]");
+
+        title.textContent = summary ? "Remember to seed" : "Check the seeding rules";
+        text.textContent = summary
+          ? `${r.indexer} requires you to keep seeding this torrent until one of these is reached. Leave it in your torrent app until then to avoid a hit-and-run.`
+          : `${r.indexer} is a private tracker, but Prowlarr has no seed rules for it. Check the tracker's rules and keep seeding to avoid a hit-and-run.`;
+        rule.textContent = summary ? `Seed ${summary}` : "";
+        rule.hidden = !summary;
+        ok.textContent = kind === "magnet" ? "Open magnet" : "Download .torrent";
+
+        seedDialog.returnValue = "";
+        seedDialog.addEventListener("close", () => resolve(seedDialog.returnValue === "ok"), { once: true });
+        seedDialog.showModal();
+        ok.focus();
+      });
+
     const runAction = async (action, id, button) => {
       const result = findResult(id);
       const seedText = seedSummary(result?.seed);
@@ -750,13 +785,10 @@
           return;
         }
         if (action === "local") {
-          if (button.dataset.kind === "magnet") await openMagnet(id);
+          const kind = button.dataset.kind;
+          if (needsSeedConfirm(result) && !(await confirmSeeding(result, kind))) return;
+          if (kind === "magnet") await openMagnet(id);
           else await saveFile(id);
-          if (seedText) {
-            showToast(`Remember to seed: ${result.indexer} asks for ${seedText}.`, "info");
-          } else if (result?.privacy === "private" && result.protocol === "torrent") {
-            showToast(`${result.indexer} is private. Check its seeding rules to avoid a hit-and-run.`, "info");
-          }
         }
       } catch (error) {
         showToast(error instanceof Error ? error.message : "That didn't work.", "error");

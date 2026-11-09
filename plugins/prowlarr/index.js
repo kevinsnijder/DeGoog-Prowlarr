@@ -38,6 +38,9 @@ let limitPerIndexer = DEFAULT_LIMIT;
 let timeoutMs = DEFAULT_TIMEOUT_S * 1000;
 let streamResults = true;
 let localDownload = "auto";
+const DEFAULT_SEND_LABEL = "Send to {client}";
+const MAX_SEND_LABEL_LENGTH = 60;
+let sendLabel = DEFAULT_SEND_LABEL;
 const LOCAL_DOWNLOAD_MODES = ["auto", "magnet", "file"];
 
 const authVerdicts = new Map();
@@ -810,6 +813,15 @@ export default {
         "On: one Prowlarr request per indexer, and each indexer's results appear as soon as it answers. Off: one combined request, and everything appears when the slowest indexer is done. If your reverse proxy buffers responses, streaming only shows results at the end.",
     },
     {
+      key: "sendLabel",
+      label: "Send button text",
+      type: "text",
+      default: DEFAULT_SEND_LABEL,
+      placeholder: DEFAULT_SEND_LABEL,
+      description:
+        "Text on the button that has Prowlarr send a release to its download client. {client} becomes the client's name, so \"Add to {client}\" shows \"Add to qBittorrent-VPN\". Leave empty for the default.",
+    },
+    {
       key: "localDownload",
       label: "\"Download\" button on torrents",
       type: "select",
@@ -864,6 +876,7 @@ export default {
     streamResults = String(settings?.streamResults ?? "true") !== "false";
     const mode = String(settings?.localDownload ?? "auto").trim();
     localDownload = LOCAL_DOWNLOAD_MODES.includes(mode) ? mode : "auto";
+    sendLabel = String(settings?.sendLabel ?? "").trim().slice(0, MAX_SEND_LABEL_LENGTH) || DEFAULT_SEND_LABEL;
     authVerdicts.clear();
     cache()?.delete(INDEXER_CACHE_KEY).catch(() => {});
   },
@@ -877,7 +890,8 @@ export default {
     const html = template
       .replaceAll("{{apiBase}}", esc(apiBase))
       .replaceAll("{{query}}", esc(query))
-      .replaceAll("{{stream}}", streamResults ? "1" : "0");
+      .replaceAll("{{stream}}", streamResults ? "1" : "0")
+      .replaceAll("{{sendLabel}}", esc(sendLabel));
     return { title: query ? `Prowlarr: ${query}` : "Prowlarr", html };
   },
 };

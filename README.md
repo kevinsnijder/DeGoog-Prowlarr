@@ -31,12 +31,14 @@ On the results card you can:
 
 Each result has two download options:
 
-- **Send to qBittorrent** (named after your client): Prowlarr grabs the release and sends it to its own download client. That's the indexer's client if it has one, otherwise your highest-priority client for the protocol. Prowlarr also passes the indexer's seed ratio and seed time to the client.
+- **Send to qBittorrent** (named after your client; the wording is a setting): Prowlarr grabs the release and sends it to its own download client. That's the indexer's client if it has one, otherwise your highest-priority client for the protocol. Prowlarr also passes the indexer's seed ratio and seed time to the client.
 - **Download .torrent / Open magnet / Download .nzb**: gets it onto the device you're browsing from. Which one you get is set by the "Download button on torrents" setting. By default it follows each indexer's **Prefer Magnet URL** setting in Prowlarr.
 
 ### Seed requirements
 
-If an indexer has a **Seed Ratio**, **Seed Time** or **Pack Seed Time** set in Prowlarr (Indexers → edit → advanced), its results show a badge such as **Seed 3 d or ratio 1.0 (packs 5 d)**. After either download option, a reminder pops up with the same rule. Private trackers with no seed rules in Prowlarr get a **Seed rules not set** warning, because those trackers usually enforce hit-and-runs.
+If an indexer has a **Seed Ratio**, **Seed Time** or **Pack Seed Time** set in Prowlarr (Indexers → edit → advanced), its results show a badge such as **Seed 3 d or ratio 1.0 (packs 5 d)**. Private trackers with no seed rules in Prowlarr get a **Seed rules not set** warning, because those trackers usually enforce hit-and-runs.
+
+For those torrents, **Download .torrent / Open magnet** first opens a **Remember to seed** dialog showing the rule. Nothing downloads until you confirm; Cancel or Esc stops it. "Send to client" doesn't ask, because Prowlarr passes the seed rules to the client itself.
 
 Results stay cached for 25 minutes, so paging and filtering don't run a new search. The refresh button forces a fresh one.
 
@@ -70,6 +72,7 @@ Go to **Settings → Plugins → Prowlarr → Configure**:
 | Categories | Optional Newznab IDs, e.g. `2000,5000`. Leave empty to search everything. |
 | Indexer IDs | Optional. Leave empty to search every enabled indexer. |
 | Stream results | On by default. On: one Prowlarr request per indexer, results appear as each answers. Off: one combined request, everything appears when the slowest indexer finishes. Your reverse proxy must not buffer responses for streaming to show up live (the plugin sends `X-Accel-Buffering: no` for nginx). |
+| Send button text | Default `Send to {client}`. `{client}` becomes the download client's name, e.g. `Add to {client}` or just `Download on server`. |
 | "Download" button on torrents | `auto` (default) follows each indexer's Prefer Magnet URL setting in Prowlarr. `magnet` opens the magnet when there is one. `file` saves the .torrent when there is one. |
 | Results per indexer | Default 100. |
 | Search timeout | Default 60s, max 110s. If a reverse proxy sits in front of degoog, its read timeout must be at least this long. |

@@ -3,6 +3,7 @@
   data-api-base="{{apiBase}}"
   data-query="{{query}}"
   data-stream="{{stream}}"
+  data-send-label="{{sendLabel}}"
 >
   <div class="prowlarr-meta">
     <span class="prowlarr-meta-text" data-subtitle>Checking access…</span>
@@ -27,4 +28,17 @@
   </div>
   <nav class="pagination prowlarr-pager" data-pager aria-label="Prowlarr result pages" hidden></nav>
   <div class="prowlarr-toast" data-toast role="status" aria-live="polite" hidden></div>
+
+  <dialog class="prowlarr-dialog" data-seed-dialog aria-labelledby="prowlarr-seed-title">
+    <form method="dialog" class="prowlarr-dialog-form">
+      <i class="fa-solid fa-seedling prowlarr-dialog-icon" aria-hidden="true"></i>
+      <h2 class="prowlarr-dialog-title" id="prowlarr-seed-title" data-seed-title>Remember to seed</h2>
+      <p class="prowlarr-dialog-text" data-seed-text></p>
+      <p class="prowlarr-dialog-rule" data-seed-rule hidden></p>
+      <div class="prowlarr-dialog-actions">
+        <button type="submit" value="cancel" class="prowlarr-mbtn prowlarr-mbtn--text">Cancel</button>
+        <button type="submit" value="ok" class="prowlarr-mbtn prowlarr-mbtn--filled" data-seed-ok>Download</button>
+      </div>
+    </form>
+  </dialog>
 </div>
