@@ -376,6 +376,19 @@
   text-overflow: ellipsis;
 }
 
+/*
+ * degoog draws tooltips as the button's ::after, which inherits the button's
+ * nowrap and so ran past the tooltip box. Let the tooltip text wrap, and
+ * give these longer hints a little more room.
+ */
+.prowlarr-mbtn[data-tooltip]::after {
+  white-space: normal;
+  max-width: min(16rem, 80vw);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.4;
+}
+
 .prowlarr-mbtn i {
   flex-shrink: 0;
   font-size: 0.875rem;
