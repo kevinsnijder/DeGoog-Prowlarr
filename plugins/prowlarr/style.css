@@ -19,12 +19,20 @@
   max-width: calc(40.75rem + 2.5rem + 21.25rem);
 }
 
-.prowlarr-command {
+/*
+ * degoog gives every bang card (.command-result) the normal results width
+ * (max-width 40.75rem) and 1.5rem of padding above. Lift the width cap so
+ * the card fills #results-main, and drop the top padding so the summary
+ * line sits right under degoog's "Prowlarr: query" heading.
+ */
+.command-result.prowlarr-command {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   width: 100%;
+  max-width: none;
   min-width: 0;
+  padding: 0 0 1.5rem;
 }
 
 /* Summary line under degoog's own "Prowlarr: query" heading */
@@ -376,11 +384,15 @@
 
 @media (min-width: 768px) {
   /* Buttons take degoog's thumbnail column on the right */
+  /* As wide as the longest label (e.g. a long client name), within limits;
+     both buttons in a row share that width. */
   .prowlarr-actions {
     order: 2;
     flex-direction: column;
     flex-shrink: 0;
-    width: 11.5rem;
+    width: max-content;
+    min-width: 11.5rem;
+    max-width: 18rem;
     margin-top: 2.125rem;
   }
 
