@@ -9,8 +9,14 @@
   display: none;
 }
 
+/*
+ * Use the sidebar's space too: degoog's results column (40.75rem) + the
+ * column gap (2.5rem) + the sidebar (21.25rem), so the card ends exactly
+ * where the boxes on the right end on a normal results page. In centred
+ * layout mode that is the full 64.5rem row.
+ */
 #results-layout:has(.prowlarr-command) #results-main {
-  max-width: 54rem;
+  max-width: calc(40.75rem + 2.5rem + 21.25rem);
 }
 
 .prowlarr-command {
