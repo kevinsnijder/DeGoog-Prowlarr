@@ -94,11 +94,13 @@
 
   const formatAge = (minutes) => {
     if (!Number.isFinite(minutes)) return "";
-    if (minutes < 60) return `${Math.max(1, Math.round(minutes))} min`;
-    if (minutes < 1440) return `${Math.round(minutes / 60)} h`;
+    const ago = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+    if (minutes < 60) return ago(Math.max(1, Math.round(minutes)), "minute");
+    if (minutes < 1440) return ago(Math.round(minutes / 60), "hour");
     const days = Math.round(minutes / 1440);
-    if (days < 365) return `${days} d`;
-    return `${(days / 365).toFixed(1)} y`;
+    if (days < 365) return ago(days, "day");
+    const years = Number((days / 365).toFixed(1));
+    return `${years} year${years === 1 ? "" : "s"} ago`;
   };
 
   const LOCAL_ACTIONS = {
@@ -133,14 +135,16 @@
 
   // Shown on any indexer with seed rules in Prowlarr, and as a warning on
   // private trackers that have none, since those usually enforce hit-and-runs.
+  const BADGE = "degoog-badge degoog-badge--engine-tag prowlarr-badge";
+
   const seedBadge = (r, privacy) => {
     if (r.protocol !== "torrent") return "";
     const summary = seedSummary(r.seed);
     if (summary) {
-      return `<span class="prowlarr-seed" title="Seed requirement set for ${esc(r.indexer)} in Prowlarr. Keep seeding until either is reached."><i class="fa-solid fa-seedling"></i> Seed ${esc(summary)}</span>`;
+      return `<span class="${BADGE} prowlarr-badge--seed" data-tooltip="Seed rule for ${esc(r.indexer)} in Prowlarr. Keep seeding until one is reached."><i class="fa-solid fa-seedling"></i> Seed ${esc(summary)}</span>`;
     }
     if (privacy === "private") {
-      return `<span class="prowlarr-seed prowlarr-seed--unset" title="No seed ratio or seed time is set for ${esc(r.indexer)} in Prowlarr. Check the tracker's rules to avoid a hit-and-run."><i class="fa-solid fa-seedling"></i> Seed rules not set</span>`;
+      return `<span class="${BADGE} prowlarr-badge--unset" data-tooltip="No seed ratio or time set for ${esc(r.indexer)} in Prowlarr. Check the tracker's rules to avoid a hit-and-run."><i class="fa-solid fa-seedling"></i> Seed rules not set</span>`;
     }
     return "";
   };
@@ -159,7 +163,7 @@
   };
 
   const hero = (icon, text, extra = "") => `
-    <div class="prowlarr-hero degoog-panel">
+    <div class="prowlarr-hero">
       <i class="fa-solid ${icon} prowlarr-hero-icon"></i>
       <div class="prowlarr-hero-text">${esc(text)}</div>
       ${extra}
@@ -226,65 +230,79 @@
         .sort(SORTS[state.sort].compare);
     };
 
+    // Same markup and classes as a degoog web result, so the theme styles it:
+    // favicon + source line, big link title, grey snippet, small tag row.
     const renderRow = (r) => {
       const privacy = PRIVACY_LABELS[r.privacy] ? r.privacy : "unknown";
-      const title = r.infoUrl
-        ? `<a class="prowlarr-row-title" href="${esc(r.infoUrl)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a>`
-        : `<span class="prowlarr-row-title">${esc(r.title)}</span>`;
+      const isTorrent = r.protocol === "torrent";
       const favicon = r.favicon
-        ? `<img class="prowlarr-favicon" src="${esc(r.favicon)}" alt="" width="14" height="14" loading="lazy">`
+        ? `<img class="result-favicon degoog-result--favicon" src="${esc(r.favicon)}" alt="" width="26" height="26" loading="lazy">`
+        : `<span class="result-favicon-missing degoog-result--favicon-missing"><i class="fa-solid fa-magnet" aria-hidden="true"></i></span>`;
+      const title = r.infoUrl
+        ? `<a class="result-title degoog-result--title" href="${esc(r.infoUrl)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a>`
+        : `<span class="result-title degoog-result--title prowlarr-title-plain">${esc(r.title)}</span>`;
+
+      const snippet = [
+        formatSize(r.size),
+        formatAge(r.ageMinutes) &&
+          `<span data-tooltip="${esc(formatDate(r.publishDate))}">${esc(formatAge(r.ageMinutes))}</span>`,
+        r.categories.length > 0 && esc(r.categories.join(", ")),
+        Number.isFinite(r.files) && r.files > 1 && `${esc(formatCount(r.files))} files`,
+        !isTorrent && esc(r.protocol),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const seedTone = (r.seeders ?? 0) === 0 ? "dead" : (r.seeders ?? 0) < 5 ? "low" : "ok";
+      const peers = isTorrent
+        ? `<span class="prowlarr-peers" data-tooltip="Seeders · leechers">
+             <span class="prowlarr-peers-seed prowlarr-peers-seed--${seedTone}"><i class="fa-solid fa-arrow-up"></i>${esc(formatCount(r.seeders))}</span>
+             <span class="prowlarr-peers-leech"><i class="fa-solid fa-arrow-down"></i>${esc(formatCount(r.leechers))}</span>
+           </span>`
         : "";
-      const meta = [
-        `<span class="prowlarr-protocol prowlarr-protocol--${esc(r.protocol)}">${esc(r.protocol || "?")}</span>`,
-        formatSize(r.size) && `<span title="Size"><i class="fa-solid fa-hard-drive"></i> ${esc(formatSize(r.size))}</span>`,
-        formatAge(r.ageMinutes) && `<span title="${esc(formatDate(r.publishDate))}"><i class="fa-regular fa-clock"></i> ${esc(formatAge(r.ageMinutes))}</span>`,
-        Number.isFinite(r.files) && `<span title="Files"><i class="fa-regular fa-file"></i> ${esc(formatCount(r.files))}</span>`,
-        r.categories.length > 0 && `<span class="prowlarr-cats">${esc(r.categories.join(", "))}</span>`,
-        ...r.flags.map((flag) => `<span class="prowlarr-flag">${esc(flag)}</span>`),
+
+      const tags = [
+        seedBadge(r, privacy),
+        ...r.flags.map((flag) => `<span class="${BADGE} prowlarr-badge--flag">${esc(flag)}</span>`),
+        Number.isFinite(r.grabs) && `<span class="${BADGE}">${esc(formatCount(r.grabs))} grabs</span>`,
       ]
         .filter(Boolean)
         .join("");
-      const isTorrent = r.protocol === "torrent";
-      const seedTone = (r.seeders ?? 0) === 0 ? "dead" : (r.seeders ?? 0) < 5 ? "low" : "ok";
-      const stats = isTorrent
-        ? `<span class="prowlarr-seeders prowlarr-seeders--${seedTone}" title="Seeders"><i class="fa-solid fa-arrow-up"></i> ${esc(formatCount(r.seeders))}</span>
-           <span class="prowlarr-leechers" title="Leechers"><i class="fa-solid fa-arrow-down"></i> ${esc(formatCount(r.leechers))}</span>`
-        : "";
-      const grabs = Number.isFinite(r.grabs)
-        ? `<span class="prowlarr-grabs" title="Grabs"><i class="fa-solid fa-cart-arrow-down"></i> ${esc(formatCount(r.grabs))}</span>`
-        : "";
+
       const seedText = seedSummary(r.seed);
       const clientName = r.client || "download client";
-      const sendTitle = seedText
-        ? `Prowlarr sends it to ${clientName} and sets it to seed: ${seedText}`
+      const sendTip = seedText
+        ? `Prowlarr sends it to ${clientName} and sets it to seed ${seedText}`
         : `Prowlarr sends it to ${clientName}`;
       const local = LOCAL_ACTIONS[r.localKind === "magnet" ? "magnet" : isTorrent ? "torrent" : "nzb"];
       const actions = [
-        `<button type="button" class="prowlarr-action prowlarr-action--primary" data-action="grab" data-id="${esc(r.id)}" title="${esc(sendTitle)}"><i class="fa-solid fa-paper-plane"></i><span>Send to ${esc(clientName)}</span></button>`,
+        `<button type="button" class="degoog-btn degoog-btn--primary degoog-btn--sm prowlarr-btn" data-action="grab" data-id="${esc(r.id)}" data-tooltip="${esc(sendTip)}"><i class="fa-solid fa-paper-plane"></i><span>Send to ${esc(clientName)}</span></button>`,
         r.localKind &&
-          `<button type="button" class="prowlarr-action" data-action="local" data-kind="${esc(r.localKind)}" data-id="${esc(r.id)}" title="${esc(local.title)}"><i class="fa-solid ${local.icon}"></i><span>${esc(local.label)}</span></button>`,
+          `<button type="button" class="degoog-btn degoog-btn--sm prowlarr-btn prowlarr-btn--quiet" data-action="local" data-kind="${esc(r.localKind)}" data-id="${esc(r.id)}" data-tooltip="${esc(local.title)}"><i class="fa-solid ${local.icon}"></i><span>${esc(local.label)}</span></button>`,
       ]
         .filter(Boolean)
         .join("");
 
       return `
-        <article class="prowlarr-row">
-          <div class="prowlarr-row-main">
-            ${title}
-            <div class="prowlarr-row-source">
-              <span class="prowlarr-indexer">${favicon}${esc(r.indexer)}</span>
-              <span class="prowlarr-privacy prowlarr-privacy--${privacy}">${esc(PRIVACY_LABELS[privacy])}</span>
-              ${seedBadge(r, privacy)}
+        <div class="result-item degoog-result prowlarr-result">
+          <div class="result-item-inner degoog-result--inner">
+            <div class="result-body degoog-result--body">
+              <div class="result-url-row degoog-result--url-row">
+                ${favicon}
+                <cite class="result-cite degoog-result--cite">${esc(r.indexer)}</cite>
+                <span class="prowlarr-privacy prowlarr-privacy--${privacy}">${esc(PRIVACY_LABELS[privacy])}</span>
+                ${peers}
+              </div>
+              ${title}
+              <p class="result-snippet degoog-result--snippet">${snippet}</p>
+              ${tags ? `<div class="result-engines degoog-result--engines">${tags}</div>` : ""}
             </div>
-            <div class="prowlarr-row-meta">${meta}</div>
+            <div class="prowlarr-actions">${actions}</div>
           </div>
-          <div class="prowlarr-row-side">
-            <div class="prowlarr-row-stats">${stats}${grabs}</div>
-            <div class="prowlarr-row-actions">${actions}</div>
-          </div>
-        </article>`;
+        </div>`;
     };
 
+    // degoog's own pagination classes; clicks are handled by this card.
     const renderPager = (totalPages) => {
       if (totalPages <= 1) {
         pager.hidden = true;
@@ -294,12 +312,15 @@
       const pages = [...new Set([1, state.page - 2, state.page - 1, state.page, state.page + 1, state.page + 2, totalPages])]
         .filter((p) => p >= 1 && p <= totalPages)
         .sort((a, b) => a - b);
-      const buttons = pages.map((p, i) => {
-        const gap = i > 0 && p - pages[i - 1] > 1 ? `<span class="prowlarr-pager-gap">…</span>` : "";
-        const current = p === state.page ? ` aria-current="page"` : "";
-        return `${gap}<button type="button" class="prowlarr-page" data-page="${p}"${current}>${p}</button>`;
+      const links = pages.map((p, i) => {
+        const gap = i > 0 && p - pages[i - 1] > 1 ? `<span class="pagination-link prowlarr-pager-gap">…</span>` : "";
+        const link =
+          p === state.page
+            ? `<span class="pagination-current" aria-current="page">${p}</span>`
+            : `<a class="pagination-link" data-page="${p}" role="button" tabindex="0">${p}</a>`;
+        return `${gap}${link}`;
       });
-      pager.innerHTML = buttons.join("");
+      pager.innerHTML = `<div class="pagination-pages">${links.join("")}</div>`;
       pager.hidden = false;
     };
 
@@ -348,7 +369,8 @@
           option("all", "All protocols", state.protocol),
           ...protocols.map((p) => option(p, p, state.protocol)),
         ].join("");
-        protocolSelect.hidden = protocols.length < 2;
+        const wrap = toolbar.querySelector("[data-protocol-wrap]");
+        if (wrap) wrap.hidden = protocols.length < 2;
       }
     };
 
@@ -361,24 +383,38 @@
         .map((value) => {
           const label = value === "all" ? "All" : PRIVACY_LABELS[value];
           const pressed = state.privacy === value;
-          const tone = value === "all" ? "" : ` prowlarr-chip--${value}`;
-          return `<button type="button" class="prowlarr-chip${tone}" data-privacy="${value}" aria-pressed="${pressed}">${esc(label)}</button>`;
+          const dot = value === "all" ? "" : `<span class="prowlarr-dot prowlarr-dot--${value}"></span>`;
+          return `<button type="button" class="prowlarr-chip" data-privacy="${value}" aria-pressed="${pressed}">${dot}${esc(label)}</button>`;
         })
         .join("");
 
+      // Laid out like degoog's filter bar: search on top, controls below.
       toolbar.innerHTML = `
-        <input type="search" class="prowlarr-input" data-filter="text" placeholder="Filter titles…" aria-label="Filter titles" value="${esc(state.text)}">
-        <div class="prowlarr-chips" role="group" aria-label="Indexer privacy">${privacyChips}</div>
-        <select class="prowlarr-select" data-filter="indexer" aria-label="Indexer"></select>
-        <select class="prowlarr-select" data-filter="protocol" aria-label="Protocol" hidden></select>
-        <select class="prowlarr-select" data-filter="sort" aria-label="Sort by">
-          ${Object.entries(SORTS).map(([key, sort]) => option(key, `Sort: ${sort.label}`, state.sort)).join("")}
-        </select>
-        <label class="prowlarr-toggle">
-          <input type="checkbox" data-filter="hideDead"${state.hideDead ? " checked" : ""}>
-          Hide dead
-        </label>
-        <span class="prowlarr-count" data-count></span>`;
+        <div class="prowlarr-filters-top">
+          <div class="prowlarr-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" class="degoog-input" data-filter="text" placeholder="Filter titles" aria-label="Filter titles" value="${esc(state.text)}">
+          </div>
+          <div class="degoog-select-wrap prowlarr-select-wrap">
+            <select class="degoog-input prowlarr-select" data-filter="sort" aria-label="Sort by">
+              ${Object.entries(SORTS).map(([key, sort]) => option(key, sort.label, state.sort)).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="prowlarr-filters-row">
+          <div class="prowlarr-chips" role="group" aria-label="Indexer privacy">${privacyChips}</div>
+          <div class="degoog-select-wrap prowlarr-select-wrap">
+            <select class="degoog-input prowlarr-select" data-filter="indexer" aria-label="Indexer"></select>
+          </div>
+          <div class="degoog-select-wrap prowlarr-select-wrap" data-protocol-wrap hidden>
+            <select class="degoog-input prowlarr-select" data-filter="protocol" aria-label="Protocol"></select>
+          </div>
+          <label class="prowlarr-check">
+            <input type="checkbox" data-filter="hideDead"${state.hideDead ? " checked" : ""}>
+            <span>Hide dead</span>
+          </label>
+          <span class="prowlarr-count" data-count></span>
+        </div>`;
       toolbar.hidden = false;
       updateFilterOptions();
     };
@@ -409,12 +445,12 @@
       const parts = [];
       if (state.pending.length > 0) {
         parts.push(
-          `<button type="button" class="prowlarr-new" data-merge><i class="fa-solid fa-arrows-rotate"></i> ${esc(plural(state.pending.length, "new result"))}, show sorted</button>`,
+          `<button type="button" class="degoog-btn degoog-btn--sm prowlarr-new" data-merge><i class="fa-solid fa-arrow-up"></i> ${esc(plural(state.pending.length, "new result"))}, show sorted</button>`,
         );
       }
       if (state.failed.length > 0) {
         const names = state.failed
-          .map((f) => `<span class="prowlarr-failed-name" title="${esc(f.error)}">${esc(f.indexer)}</span>`)
+          .map((f) => `<span class="prowlarr-failed-name" data-tooltip="${esc(f.error)}">${esc(f.indexer)}</span>`)
           .join(", ");
         parts.push(
           `<span class="prowlarr-failed"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(plural(state.failed.length, "indexer"))} failed: ${names}</span>`,

@@ -7,7 +7,7 @@
       "path": "plugins/prowlarr",
       "name": "Prowlarr",
       "description": "!prowlarr searches every Prowlarr indexer, sorted by seeders, with indexer and privacy shown per result. Only for users signed into the degoog settings.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "type": "command",
       "minDegoogVersion": "1.1.0"
     }
