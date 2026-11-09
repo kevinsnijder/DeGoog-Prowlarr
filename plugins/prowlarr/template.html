@@ -1,0 +1,36 @@
+<div
+  class="command-result prowlarr-command"
+  data-api-base="{{apiBase}}"
+  data-query="{{query}}"
+  data-stream="{{stream}}"
+>
+  <div class="prowlarr-header">
+    <div class="prowlarr-heading">
+      <span class="prowlarr-logo"><i class="fa-solid fa-satellite-dish"></i></span>
+      <div class="prowlarr-heading-text">
+        <span class="prowlarr-title">Prowlarr</span>
+        <span class="prowlarr-subtitle" data-subtitle>Checking access…</span>
+      </div>
+    </div>
+    <button
+      type="button"
+      class="degoog-icon-btn prowlarr-refresh"
+      data-refresh
+      aria-label="Search again"
+      title="Search again"
+      hidden
+    >
+      <i class="fa-solid fa-rotate"></i>
+    </button>
+  </div>
+  <div class="prowlarr-toolbar" data-toolbar hidden></div>
+  <div class="prowlarr-status" data-status hidden></div>
+  <div class="prowlarr-body" data-body>
+    <div class="prowlarr-hero degoog-panel">
+      <i class="fa-solid fa-spinner fa-spin prowlarr-hero-icon"></i>
+      <div class="prowlarr-hero-text">Loading…</div>
+    </div>
+  </div>
+  <nav class="prowlarr-pager" data-pager aria-label="Prowlarr result pages" hidden></nav>
+  <div class="prowlarr-toast" data-toast role="status" aria-live="polite" hidden></div>
+</div>
